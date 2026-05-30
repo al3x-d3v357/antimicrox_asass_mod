@@ -215,6 +215,53 @@ function Invoke-AuditSettings {
     Write-Host "`nRelatorio markdown salvo em: $docPath"
 }
 
+function Test-GamepadConnected {
+    # 1. Tenta usar Get-PnpDevice (disponivel no Win10/11)
+    if (Get-Command Get-PnpDevice -ErrorAction SilentlyContinue) {
+        $devices = Get-PnpDevice -Class "Gamepad", "Joystick" -Status "OK" -ErrorAction SilentlyContinue
+        if ($devices) {
+            return $true
+        }
+    }
+    
+    # 2. Alternativa com WMI/CIM pesquisando por termos comuns na PNPClass
+    $wmiDevices = Get-CimInstance Win32_PNPEntity -Filter "PNPClass = 'Gamepad' OR PNPClass = 'Joystick'" -ErrorAction SilentlyContinue
+    if ($wmiDevices) {
+        return $true
+    }
+    
+    # 3. Busca secundaria na classe HID por nomes comuns se as anteriores falharem
+    $hidDevices = Get-CimInstance Win32_PNPEntity -Filter "PNPClass = 'HIDClass'" -ErrorAction SilentlyContinue
+    if ($hidDevices) {
+        $matchingHid = $hidDevices | Where-Object { $_.Name -match "controller|gamepad|joystick|direção|manche|controlador de jogo" }
+        if ($matchingHid) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
+function Get-AvailableProfiles {
+    param([string]$Root)
+    $ps1Dir = Join-Path $Root "ps1"
+    $ps3Dir = Join-Path $Root "ps3"
+    
+    $profiles = @()
+    if (Test-Path -LiteralPath $ps1Dir) {
+        $profiles += Get-ChildItem -LiteralPath $ps1Dir -Filter "*.amgp" | ForEach-Object {
+            [pscustomobject]@{ Name = $_.Name; Folder = "ps1" }
+        }
+    }
+    if (Test-Path -LiteralPath $ps3Dir) {
+        $profiles += Get-ChildItem -LiteralPath $ps3Dir -Filter "*.amgp" | ForEach-Object {
+            [pscustomobject]@{ Name = $_.Name; Folder = "ps3" }
+        }
+    }
+    
+    return $profiles
+}
+
 function Start-App {
     param([string]$Root, [string]$SelectedTheme, [bool]$UseVanilla)
 
@@ -227,6 +274,11 @@ function Start-App {
 
     if (-not (Test-Path -LiteralPath $exePath)) {
         throw "Executavel nao encontrado em bin/: asass-mod.exe ou antimicrox.exe"
+    }
+
+    # Alerta se nao houver controle ativo
+    if (-not (Test-GamepadConnected)) {
+        Write-Warning "Aviso: Nenhum controle ou joystick ativo foi detectado via USB. O AntiMicroX pode abrir sem reconhecer dispositivos de entrada."
     }
 
     if ($UseVanilla) {
@@ -365,6 +417,7 @@ function Build-SingleFilePack {
     $includePaths = @(
         (Join-Path $Root "asass-mod.ps1"),
         (Join-Path $Root "asass-mod.cmd"),
+        (Join-Path $Root "run.cmd"),
         (Join-Path $Root "README.md"),
         (Join-Path $Root "bin"),
         (Join-Path $Root "ps1"),
@@ -382,14 +435,179 @@ function Build-SingleFilePack {
     }
 
     Compress-Archive -Path $validPaths -DestinationPath $singleFile -CompressionLevel Optimal -Force
-    Write-Host "Arquivo unico gerado: $singleFile"
+    Write-Host "Arquivo unico ZIP gerado: $singleFile"
+}
+
+function Build-SingleExePack {
+    param([string]$Root)
+
+    $distDir = Join-Path $Root "dist"
+    if (-not (Test-Path -LiteralPath $distDir)) {
+        New-Item -Path $distDir -ItemType Directory | Out-Null
+    }
+
+    $targetExe = Join-Path $distDir "asass-mod.exe"
+    $tempZip = Join-Path $distDir "app.zip"
+    $tempCs = Join-Path $distDir "bootstrap.cs"
+
+    Write-Host "Preparando arquivos para empacotamento do executavel..." -ForegroundColor Cyan
+
+    $includePaths = @(
+        (Join-Path $Root "asass-mod.ps1"),
+        (Join-Path $Root "asass-mod.cmd"),
+        (Join-Path $Root "run.cmd"),
+        (Join-Path $Root "README.md"),
+        (Join-Path $Root "bin"),
+        (Join-Path $Root "ps1"),
+        (Join-Path $Root "ps3"),
+        (Join-Path $Root "themes")
+    )
+
+    $validPaths = @($includePaths | Where-Object { Test-Path -LiteralPath $_ })
+    if ($validPaths.Count -eq 0) {
+        throw "Nada para empacotar."
+    }
+
+    if (Test-Path -LiteralPath $tempZip) {
+        Remove-Item -LiteralPath $tempZip -Force
+    }
+
+    Write-Host "Criando arquivo compactado temporario..."
+    Compress-Archive -Path $validPaths -DestinationPath $tempZip -CompressionLevel Optimal -Force
+
+    Write-Host "Gerando codigo do compilador bootstrap..."
+    $csCode = @"
+using System;
+using System.IO;
+using System.Reflection;
+using System.Diagnostics;
+using System.IO.Compression;
+
+class Program
+{
+    static void Main(string[] args)
+    {
+        string tempDir = Path.Combine(Path.GetTempPath(), "asass_mod_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        
+        try
+        {
+            Assembly assembly = Assembly.GetExecutingAssembly();
+            string resourceName = null;
+            foreach (string name in assembly.GetManifestResourceNames())
+            {
+                if (name.EndsWith("app.zip", StringComparison.OrdinalIgnoreCase))
+                {
+                    resourceName = name;
+                    break;
+                }
+            }
+            
+            if (resourceName == null)
+            {
+                Console.WriteLine("Erro interno: Recurso do aplicativo nao encontrado.");
+                return;
+            }
+            
+            string zipPath = Path.Combine(tempDir, "app.zip");
+            using (Stream resourceStream = assembly.GetManifestResourceStream(resourceName))
+            using (FileStream fileStream = new FileStream(zipPath, FileMode.Create, FileAccess.Write))
+            {
+                resourceStream.CopyTo(fileStream);
+            }
+            
+            ZipFile.ExtractToDirectory(zipPath, tempDir);
+            File.Delete(zipPath);
+            
+            string scriptPath = Path.Combine(tempDir, "asass-mod.ps1");
+            string psArgs = "-ExecutionPolicy Bypass -File \"" + scriptPath + "\"";
+            if (args.Length > 0)
+            {
+                psArgs += " " + string.Join(" ", args);
+            }
+            
+            ProcessStartInfo psi = new ProcessStartInfo();
+            psi.FileName = "powershell.exe";
+            psi.Arguments = psArgs;
+            psi.UseShellExecute = false;
+            psi.CreateNoWindow = false;
+            
+            using (Process process = Process.Start(psi))
+            {
+                process.WaitForExit();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Erro ao inicializar o asass-mod portatil:");
+            Console.WriteLine(ex.Message);
+            Console.WriteLine("Pressione qualquer tecla para sair...");
+            Console.ReadKey();
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(tempDir))
+                {
+                    Directory.Delete(tempDir, true);
+                }
+            }
+            catch
+            {
+                // Ignorar se algum arquivo ainda estiver em uso
+            }
+        }
+    }
+}
+"@
+
+    Set-Content -LiteralPath $tempCs -Value $csCode -Encoding UTF8
+
+    Write-Host "Compilando executavel unico (SFX)..."
+    $cscPath = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+    if (-not (Test-Path -LiteralPath $cscPath)) {
+        throw "Compilador csc.exe nao encontrado em $cscPath."
+    }
+
+    $arguments = @(
+        "/nologo",
+        "/out:$targetExe",
+        "/r:System.IO.Compression.FileSystem.dll",
+        "/r:System.IO.Compression.dll",
+        "/resource:$tempZip",
+        $tempCs
+    )
+
+    $proc = Start-Process -FilePath $cscPath -ArgumentList $arguments -Wait -NoNewWindow -PassThru
+    
+    if (Test-Path -LiteralPath $tempZip) { Remove-Item -LiteralPath $tempZip -Force }
+    if (Test-Path -LiteralPath $tempCs) { Remove-Item -LiteralPath $tempCs -Force }
+
+    if ($proc.ExitCode -ne 0) {
+        throw "Erro durante a compilacao do executavel. Codigo de saida: $($proc.ExitCode)"
+    }
+
+    Write-Host "`n[SUCESSO] Executavel portatil unico criado com sucesso!" -ForegroundColor Green
+    Write-Host "Arquivo gerado: $targetExe" -ForegroundColor Green
 }
 
 function Show-Menu {
     param([string]$Root, [string]$SelectedTheme)
 
+    $hasGamepad = Test-GamepadConnected
+    $gamepadStatus = if ($hasGamepad) {
+        " [Controle USB: Detectado]"
+    } else {
+        " [Controle USB: Nao detectado (Reconecte se necessario)]"
+    }
+    $gamepadColor = if ($hasGamepad) { "Green" } else { "Yellow" }
+
     Write-Host ""
     Write-Host "=== asass mod :: arquivo unico ==="
+    Write-Host -NoNewline "Status:"
+    Write-Host $gamepadStatus -ForegroundColor $gamepadColor
+    Write-Host ""
     Write-Host "1) Abrir app (tema custom)"
     Write-Host "2) Abrir app (vanilla)"
     Write-Host "3) Setup portatil"
@@ -397,7 +615,7 @@ function Show-Menu {
     Write-Host "5) Auditar settings"
     Write-Host "6) Trocar perfil ativo"
     Write-Host "7) Backup pack (.zip)"
-    Write-Host "8) Build arquivo unico (.zip)"
+    Write-Host "8) Build arquivo unico (.zip e .exe)"
     Write-Host "9) Sair"
     Write-Host ""
 
@@ -409,11 +627,35 @@ function Show-Menu {
         "4" { Invoke-SetupPortable -Root $Root -ShouldClean $true }
         "5" { Invoke-AuditSettings -Root $Root }
         "6" {
-            $profile = Read-Host "Digite o nome do perfil (ex: mb.gamecontroller.amgp)"
-            Set-ActiveProfile -Root $Root -Profile $profile -ForceAll $false
+            $profiles = Get-AvailableProfiles -Root $Root
+            if ($profiles.Count -eq 0) {
+                Write-Warning "Nenhum perfil .amgp encontrado em ps1/ ou ps3/."
+            }
+            else {
+                Write-Host "`nPerfis disponiveis:" -ForegroundColor Cyan
+                for ($i = 0; $i -lt $profiles.Count; $i++) {
+                    $p = $profiles[$i]
+                    Write-Host ("{0,2}) [{1}] {2}" -f ($i + 1), $p.Folder, $p.Name)
+                }
+                Write-Host ""
+                $sel = Read-Host "Escolha o numero do perfil para ativar (ou pressione Enter para cancelar)"
+                if ([string]::IsNullOrWhiteSpace($sel)) {
+                    Write-Host "Troca de perfil cancelada."
+                }
+                elseif ([int]::TryParse($sel, [ref]$index) -and $index -ge 1 -and $index -le $profiles.Count) {
+                    $chosen = $profiles[$index - 1].Name
+                    Set-ActiveProfile -Root $Root -Profile $chosen -ForceAll $false
+                }
+                else {
+                    Write-Host "Opcao invalida." -ForegroundColor Yellow
+                }
+            }
         }
         "7" { Backup-Pack -Root $Root }
-        "8" { Build-SingleFilePack -Root $Root }
+        "8" {
+            Build-SingleFilePack -Root $Root
+            Build-SingleExePack -Root $Root
+        }
         default { Write-Host "Saindo." }
     }
 }
@@ -441,6 +683,7 @@ if ($Backup) {
 
 if ($BuildSingle -or $RebuildSingle) {
     Build-SingleFilePack -Root $ProjectRoot
+    Build-SingleExePack -Root $ProjectRoot
 }
 
 if ($Run -or $Vanilla) {
