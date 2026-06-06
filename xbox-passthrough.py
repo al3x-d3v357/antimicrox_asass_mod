@@ -72,7 +72,7 @@ class XboxPassthrough(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Xbox 360 Passthrough")
-        self.setFixedSize(350, 450)
+        self.setFixedSize(380, 520)
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.drag_position = QPoint()
@@ -81,8 +81,23 @@ class XboxPassthrough(QWidget):
         self.gamepad = None
         self.joystick_id = None
         self.running = False
+        self.testing_mode = False
         self.button_widgets = {}
         self.connected_joysticks = []
+
+        # Mapeamento personalizável (formato: índice_do_controle: (nome_visual, botão_xbox))
+        self.button_map = {
+            1: ("A", vg.XUSB_BUTTON.XUSB_GAMEPAD_A),
+            2: ("B", vg.XUSB_BUTTON.XUSB_GAMEPAD_B),
+            0: ("X", vg.XUSB_BUTTON.XUSB_GAMEPAD_X),
+            3: ("Y", vg.XUSB_BUTTON.XUSB_GAMEPAD_Y),
+            4: ("LB", vg.XUSB_BUTTON.XUSB_GAMEPAD_LEFT_SHOULDER),
+            5: ("RB", vg.XUSB_BUTTON.XUSB_GAMEPAD_RIGHT_SHOULDER),
+            8: ("BACK", vg.XUSB_BUTTON.XUSB_GAMEPAD_BACK),
+            9: ("START", vg.XUSB_BUTTON.XUSB_GAMEPAD_START),
+            10: ("L3", vg.XUSB_BUTTON.XUSB_GAMEPAD_LEFT_THUMB),
+            11: ("R3", vg.XUSB_BUTTON.XUSB_GAMEPAD_RIGHT_THUMB),
+        }
 
         self.init_ui()
         self.detect_joysticks()
@@ -95,7 +110,7 @@ class XboxPassthrough(QWidget):
         # Container principal com sombra e bordas arredondadas
         self.main_frame = QFrame(self)
         self.main_frame.setObjectName("MainFrame")
-        self.main_frame.resize(350, 450)
+        self.main_frame.resize(380, 520)
         self.main_frame.setStyleSheet("""
             #MainFrame {
                 background-color: #12171D;
@@ -104,7 +119,7 @@ class XboxPassthrough(QWidget):
             }
         """)
 
-        # Adiciona sombra projetada premium
+        # Sombra projetada premium
         shadow = QGraphicsDropShadowEffect(self)
         shadow.setBlurRadius(20)
         shadow.setXOffset(0)
@@ -114,7 +129,7 @@ class XboxPassthrough(QWidget):
 
         layout = QVBoxLayout(self.main_frame)
         layout.setContentsMargins(15, 15, 15, 15)
-        layout.setSpacing(10)
+        layout.setSpacing(8)
 
         # Cabeçalho
         header = QHBoxLayout()
@@ -150,6 +165,20 @@ class XboxPassthrough(QWidget):
         self.combo_joystick.currentIndexChanged.connect(self.on_joystick_selected)
         layout.addWidget(self.combo_joystick)
 
+        # Botão de Teste (Modo Detecção)
+        self.btn_test = QPushButton("🔍 TESTAR BOTÕES (Modo Detecção)")
+        self.btn_test.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_test.setStyleSheet("""
+            QPushButton { background-color: #5C5C5C; color: white; font-size: 12px; 
+                         font-weight: bold; border: none; border-radius: 6px; 
+                         min-height: 32px; }
+            QPushButton:hover { background-color: #6E6E6E; }
+            QPushButton:pressed { background-color: #404040; }
+            QPushButton:disabled { background-color: #1A222B; color: #71808E; border: 1px solid #2A3440; }
+        """)
+        self.btn_test.clicked.connect(self.toggle_test_mode)
+        layout.addWidget(self.btn_test)
+
         # Grid visual dos botões (Layout estilo Xbox)
         self.btn_grid = QFrame()
         self.btn_grid.setStyleSheet("""
@@ -166,10 +195,10 @@ class XboxPassthrough(QWidget):
         
         # Linha 2: ABXY
         row2 = QHBoxLayout()
-        row2.addWidget(self.create_button_widget("Y", "#F1C40F"))  # Amarelo
-        row2.addWidget(self.create_button_widget("X", "#2ECC71"))  # Verde
-        row2.addWidget(self.create_button_widget("B", "#E74C3C"))  # Vermelho
-        row2.addWidget(self.create_button_widget("A", "#3498DB"))  # Azul
+        row2.addWidget(self.create_button_widget("Y", "#F1C40F"))
+        row2.addWidget(self.create_button_widget("X", "#2ECC71"))
+        row2.addWidget(self.create_button_widget("B", "#E74C3C"))
+        row2.addWidget(self.create_button_widget("A", "#3498DB"))
         grid_layout.addLayout(row2)
         
         # Linha 3: D-Pad e Sticks
@@ -187,13 +216,24 @@ class XboxPassthrough(QWidget):
         
         layout.addWidget(self.btn_grid)
 
-        # Status
+        # Console de Teste (Detecção de Índices)
+        self.test_console = QLabel("Modo de teste desativado")
+        self.test_console.setStyleSheet("""
+            QLabel { background-color: #0A0E13; color: #AAAAAA; 
+                    border: 1px solid #2B3845; border-radius: 6px; 
+                    padding: 8px; font-family: Consolas; font-size: 11px; }
+        """)
+        self.test_console.setWordWrap(True)
+        self.test_console.setMinimumHeight(65)
+        layout.addWidget(self.test_console)
+
+        # Status de conexão
         self.lbl_status = QLabel("⚪ Aguardando conexão...")
         self.lbl_status.setStyleSheet("color: #AAAAAA; font-size: 11px; padding: 3px;")
         self.lbl_status.setWordWrap(True)
         layout.addWidget(self.lbl_status)
 
-        # Botão de Ativar
+        # Botão de Ativar Emulação
         self.btn_toggle = QPushButton("▶ INICIAR EMULAÇÃO")
         self.btn_toggle.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_toggle.setStyleSheet("""
@@ -225,6 +265,7 @@ class XboxPassthrough(QWidget):
             self.lbl_status.setText("⚠ API de áudio/jogos do Windows não disponível!")
             self.lbl_status.setStyleSheet("color: #FF5555; font-size: 11px; padding: 3px;")
             self.btn_toggle.setEnabled(False)
+            self.btn_test.setEnabled(False)
             return
 
         self.combo_joystick.clear()
@@ -248,10 +289,10 @@ class XboxPassthrough(QWidget):
             self.lbl_status.setText("⚠ Nenhum controle USB detectado!")
             self.lbl_status.setStyleSheet("color: #FF5555; font-size: 11px; padding: 3px;")
             self.btn_toggle.setEnabled(False)
+            self.btn_test.setEnabled(False)
         else:
             self.lbl_status.setText(f"✅ {count} controle(s) encontrado(s).")
             self.lbl_status.setStyleSheet("color: #107C10; font-size: 11px; padding: 3px;")
-            # Seleciona automaticamente o primeiro controle
             self.on_joystick_selected(0)
 
     def on_joystick_selected(self, index):
@@ -261,6 +302,49 @@ class XboxPassthrough(QWidget):
             self.lbl_status.setText(f"🎯 Selecionado: {name}")
             self.lbl_status.setStyleSheet("color: #56D4FF; font-size: 11px; padding: 3px;")
             self.btn_toggle.setEnabled(True)
+            self.btn_test.setEnabled(True)
+
+    def toggle_test_mode(self):
+        if not self.testing_mode:
+            self.testing_mode = True
+            self.btn_test.setText("⏹ PARAR TESTE")
+            self.btn_test.setStyleSheet("""
+                QPushButton { background-color: #C62828; color: white; font-size: 12px; 
+                             font-weight: bold; border: none; border-radius: 6px; 
+                             min-height: 32px; }
+                QPushButton:hover { background-color: #E53935; }
+                QPushButton:pressed { background-color: #B71C1C; }
+            """)
+            self.test_console.setText("🔍 Pressione botões ou mova os analógicos do controle para testar...")
+            self.test_console.setStyleSheet("""
+                QLabel { background-color: #0A0E13; color: #56D4FF; 
+                        border: 1px solid #56D4FF; border-radius: 6px; 
+                        padding: 8px; font-family: Consolas; font-size: 11px; }
+            """)
+            # Desabilita o botão de emular enquanto testa
+            self.btn_toggle.setEnabled(False)
+            if not self.timer.isActive():
+                self.timer.start(16)
+        else:
+            self.testing_mode = False
+            self.btn_test.setText("🔍 TESTAR BOTÕES (Modo Detecção)")
+            self.btn_test.setStyleSheet("""
+                QPushButton { background-color: #5C5C5C; color: white; font-size: 12px; 
+                             font-weight: bold; border: none; border-radius: 6px; 
+                             min-height: 32px; }
+                QPushButton:hover { background-color: #6E6E6E; }
+                QPushButton:pressed { background-color: #404040; }
+            """)
+            self.test_console.setText("Modo de teste desativado")
+            self.test_console.setStyleSheet("""
+                QLabel { background-color: #0A0E13; color: #AAAAAA; 
+                        border: 1px solid #2B3845; border-radius: 6px; 
+                        padding: 8px; font-family: Consolas; font-size: 11px; }
+            """)
+            self.btn_toggle.setEnabled(True)
+            if not self.running:
+                self.timer.stop()
+            self.reset_visual_buttons()
 
     def toggle_emulation(self):
         if not self.running:
@@ -268,6 +352,7 @@ class XboxPassthrough(QWidget):
             try:
                 self.gamepad = vg.VX360Gamepad()
                 self.running = True
+                self.btn_test.setEnabled(False)  # Desabilita teste durante emulação
                 self.timer.start(16)  # ~60 FPS
                 self.btn_toggle.setText("⏹ PARAR EMULAÇÃO")
                 self.btn_toggle.setStyleSheet("""
@@ -277,7 +362,7 @@ class XboxPassthrough(QWidget):
                     QPushButton:hover { background-color: #E53935; }
                     QPushButton:pressed { background-color: #B71C1C; }
                 """)
-                self.lbl_status.setText("🟢 Emulação ATIVA - Controle virtual de Xbox 360 criado!")
+                self.lbl_status.setText("🟢 Emulação ATIVA - Controle virtual de Xbox 360 em funcionamento.")
                 self.lbl_status.setStyleSheet("color: #107C10; font-size: 11px; padding: 3px;")
             except Exception as e:
                 self.lbl_status.setText(f"❌ Falha: ViGEmBus instalado? {str(e)[:40]}")
@@ -285,6 +370,7 @@ class XboxPassthrough(QWidget):
         else:
             # Parar
             self.running = False
+            self.btn_test.setEnabled(True)
             self.timer.stop()
             if self.gamepad:
                 self.gamepad.reset()
@@ -302,7 +388,7 @@ class XboxPassthrough(QWidget):
             self.reset_visual_buttons()
 
     def update_loop(self):
-        if not self.running or self.joystick_id is None or not self.gamepad:
+        if self.joystick_id is None:
             return
 
         info = JOYINFOEX()
@@ -312,31 +398,48 @@ class XboxPassthrough(QWidget):
         
         if res != JOYERR_NOERROR:
             # Controle desconectado repentinamente
-            self.toggle_emulation()
+            if self.running:
+                self.toggle_emulation()
+            if self.testing_mode:
+                self.toggle_test_mode()
             self.detect_joysticks()
+            return
+
+        # MODO TESTE: Apenas mostrar quais eixos e botões estão ativos na tela
+        if self.testing_mode:
+            pressed_buttons = []
+            for i in range(32): # Limite de até 32 botões físicos
+                if bool(info.dwButtons & (1 << i)):
+                    pressed_buttons.append(str(i))
+                    # Acende botões visuais correspondentes no grid se mapeados
+                    for mapped_idx, (name, _) in self.button_map.items():
+                        if mapped_idx == i:
+                            self.highlight_button(name, True)
+                else:
+                    # Apaga botões no grid
+                    for mapped_idx, (name, _) in self.button_map.items():
+                        if mapped_idx == i:
+                            self.highlight_button(name, False)
+            
+            axes_str = f"X: {info.dwXpos} | Y: {info.dwYpos} | Z: {info.dwZpos} | R: {info.dwRpos}"
+            pov_str = f"POV: {info.dwPOV}"
+            
+            self.test_console.setText(
+                f"🔍 Botões (índices): {', '.join(pressed_buttons) if pressed_buttons else 'Nenhum'}\n"
+                f"📈 Eixos: {axes_str}\n"
+                f"🧭 D-Pad (POV): {pov_str if info.dwPOV != 65535 else 'Centralizado'}"
+            )
+            return
+
+        # MODO EMULAÇÃO: Mapear para Xbox 360
+        if not self.running or not self.gamepad:
             return
 
         # Reseta os botões no controle virtual
         self.gamepad.reset()
 
-        # --- Mapeamento DirectInput Genérico -> Xbox 360 ---
-        # Mapeamento de botões por bitmask (0 a 11)
-        button_map = {
-            0: ("A", vg.XUSB_BUTTON.XUSB_GAMEPAD_A),
-            1: ("B", vg.XUSB_BUTTON.XUSB_GAMEPAD_B),
-            2: ("X", vg.XUSB_BUTTON.XUSB_GAMEPAD_X),
-            3: ("Y", vg.XUSB_BUTTON.XUSB_GAMEPAD_Y),
-            4: ("LB", vg.XUSB_BUTTON.XUSB_GAMEPAD_LEFT_SHOULDER),
-            5: ("RB", vg.XUSB_BUTTON.XUSB_GAMEPAD_RIGHT_SHOULDER),
-            6: ("BACK", vg.XUSB_BUTTON.XUSB_GAMEPAD_BACK),
-            7: ("START", vg.XUSB_BUTTON.XUSB_GAMEPAD_START),
-            8: ("L3", vg.XUSB_BUTTON.XUSB_GAMEPAD_LEFT_THUMB),
-            9: ("R3", vg.XUSB_BUTTON.XUSB_GAMEPAD_RIGHT_THUMB),
-            10: ("XBOX", vg.XUSB_BUTTON.XUSB_GAMEPAD_GUIDE),
-        }
-
-        # Lendo e mapeando botões digitais
-        for btn_idx, (name, xbox_btn) in button_map.items():
+        # Lendo e mapeando botões digitais baseados em self.button_map
+        for btn_idx, (name, xbox_btn) in self.button_map.items():
             pressed = bool(info.dwButtons & (1 << btn_idx))
             if pressed:
                 self.gamepad.press_button(button=xbox_btn)
@@ -366,7 +469,7 @@ class XboxPassthrough(QWidget):
         ry = -(info.dwRpos - 32768)
         self.gamepad.right_joystick(x_value=rx, y_value=ry)
 
-        # Gatilhos analógicos LT/RT (eixos U/V se disponíveis, caso contrário ficam zerados)
+        # Gatilhos analógicos LT/RT (eixos U/V se disponíveis)
         lt_val = int((info.dwUpos / 65535) * 255) if info.dwUpos else 0
         rt_val = int((info.dwVpos / 65535) * 255) if info.dwVpos else 0
         self.gamepad.left_trigger(value=lt_val)
