@@ -1,11 +1,12 @@
 import sys
 import os
+import json
 import ctypes
 from ctypes import wintypes
 # pyrefly: ignore [missing-import]
 import vgamepad as vg
 from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout,
-                             QPushButton, QLabel, QFrame, QComboBox, QGraphicsDropShadowEffect, QStyleFactory)
+                             QPushButton, QLabel, QFrame, QComboBox, QGraphicsDropShadowEffect, QStyleFactory, QTextEdit)
 from PyQt6.QtCore import Qt, QTimer, QPoint
 from PyQt6.QtGui import QColor, QFont, QPalette
 
@@ -66,13 +67,49 @@ except:
     winmm = None
 
 # ==============================================================================
+# CONFIGURAÇÃO E PERSISTÊNCIA
+# ==============================================================================
+CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+
+DEFAULT_MAPPING = {
+    "A": 1,
+    "B": 2,
+    "X": 0,
+    "Y": 3,
+    "LB": 4,
+    "RB": 5,
+    "BACK": 8,
+    "START": 9,
+    "L3": 10,
+    "R3": 11
+}
+
+def load_config():
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                if isinstance(data, dict) and "buttons" in data:
+                    return data["buttons"]
+        except Exception as e:
+            print(f"Erro ao carregar config.json: {e}")
+    return DEFAULT_MAPPING.copy()
+
+def save_config(mapping):
+    try:
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump({"buttons": mapping}, f, indent=4)
+    except Exception as e:
+        print(f"Erro ao salvar config.json: {e}")
+
+# ==============================================================================
 # CLASSE PRINCIPAL DA APLICAÇÃO
 # ==============================================================================
 class XboxPassthrough(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Xbox 360 Passthrough")
-        self.setFixedSize(380, 520)
+        self.setFixedSize(420, 620)
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.drag_position = QPoint()
@@ -84,23 +121,27 @@ class XboxPassthrough(QWidget):
         self.testing_mode = False
         self.button_widgets = {}
         self.connected_joysticks = []
+        self.mapping_button = None
+        self.prev_buttons_state = 0
 
-        # Mapeamento personalizável (formato: índice_do_controle: (nome_visual, botão_xbox))
-        self.button_map = {
-            1: ("A", vg.XUSB_BUTTON.XUSB_GAMEPAD_A),
-            2: ("B", vg.XUSB_BUTTON.XUSB_GAMEPAD_B),
-            0: ("X", vg.XUSB_BUTTON.XUSB_GAMEPAD_X),
-            3: ("Y", vg.XUSB_BUTTON.XUSB_GAMEPAD_Y),
-            4: ("LB", vg.XUSB_BUTTON.XUSB_GAMEPAD_LEFT_SHOULDER),
-            5: ("RB", vg.XUSB_BUTTON.XUSB_GAMEPAD_RIGHT_SHOULDER),
-            8: ("BACK", vg.XUSB_BUTTON.XUSB_GAMEPAD_BACK),
-            9: ("START", vg.XUSB_BUTTON.XUSB_GAMEPAD_START),
-            10: ("L3", vg.XUSB_BUTTON.XUSB_GAMEPAD_LEFT_THUMB),
-            11: ("R3", vg.XUSB_BUTTON.XUSB_GAMEPAD_RIGHT_THUMB),
+        # Mapeamento dinâmico carregado do arquivo JSON
+        self.buttons_config = load_config()
+        self.xbox_buttons = {
+            "A": vg.XUSB_BUTTON.XUSB_GAMEPAD_A,
+            "B": vg.XUSB_BUTTON.XUSB_GAMEPAD_B,
+            "X": vg.XUSB_BUTTON.XUSB_GAMEPAD_X,
+            "Y": vg.XUSB_BUTTON.XUSB_GAMEPAD_Y,
+            "LB": vg.XUSB_BUTTON.XUSB_GAMEPAD_LEFT_SHOULDER,
+            "RB": vg.XUSB_BUTTON.XUSB_GAMEPAD_RIGHT_SHOULDER,
+            "BACK": vg.XUSB_BUTTON.XUSB_GAMEPAD_BACK,
+            "START": vg.XUSB_BUTTON.XUSB_GAMEPAD_START,
+            "L3": vg.XUSB_BUTTON.XUSB_GAMEPAD_LEFT_THUMB,
+            "R3": vg.XUSB_BUTTON.XUSB_GAMEPAD_RIGHT_THUMB,
         }
 
         self.init_ui()
         self.detect_joysticks()
+        self.update_button_labels()
 
         # Timer para ler o controle 60x por segundo (~16ms)
         self.timer = QTimer()
@@ -110,7 +151,7 @@ class XboxPassthrough(QWidget):
         # Container principal com sombra e bordas arredondadas
         self.main_frame = QFrame(self)
         self.main_frame.setObjectName("MainFrame")
-        self.main_frame.resize(380, 520)
+        self.main_frame.resize(420, 620)
         self.main_frame.setStyleSheet("""
             #MainFrame {
                 background-color: #12171D;
@@ -216,16 +257,29 @@ class XboxPassthrough(QWidget):
         
         layout.addWidget(self.btn_grid)
 
-        # Console de Teste (Detecção de Índices)
-        self.test_console = QLabel("Modo de teste desativado")
-        self.test_console.setStyleSheet("""
-            QLabel { background-color: #0A0E13; color: #AAAAAA; 
-                    border: 1px solid #2B3845; border-radius: 6px; 
-                    padding: 8px; font-family: Consolas; font-size: 11px; }
+        # Painel de Diagnóstico (Log)
+        self.log_area = QTextEdit()
+        self.log_area.setReadOnly(True)
+        self.log_area.setStyleSheet("""
+            QTextEdit { background-color: #0A0E13; color: #00FF00; 
+                        border: 1px solid #2B3845; border-radius: 6px; 
+                        padding: 5px; font-family: Consolas; font-size: 10px; }
         """)
-        self.test_console.setWordWrap(True)
-        self.test_console.setMinimumHeight(65)
-        layout.addWidget(self.test_console)
+        self.log_area.setPlainText("Selecione um controle e clique em 'TESTAR BOTÕES' para diagnosticar.")
+        self.log_area.setMinimumHeight(100)
+        layout.addWidget(self.log_area)
+
+        # Botão para Copiar Log
+        self.btn_copy_log = QPushButton("📋 COPIAR LOG DE DIAGNÓSTICO")
+        self.btn_copy_log.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_copy_log.setStyleSheet("""
+            QPushButton { background-color: #1A3445; color: #56D4FF; border: 1px solid #2F89A7; 
+                         border-radius: 6px; font-weight: bold; font-size: 11px; min-height: 30px; }
+            QPushButton:hover { background-color: #23465D; border: 1px solid #56D4FF; color: #FFFFFF; }
+            QPushButton:pressed { background-color: #2F5C7B; }
+        """)
+        self.btn_copy_log.clicked.connect(self.copy_diagnostic_log)
+        layout.addWidget(self.btn_copy_log)
 
         # Status de conexão
         self.lbl_status = QLabel("⚪ Aguardando conexão...")
@@ -248,17 +302,32 @@ class XboxPassthrough(QWidget):
         layout.addWidget(self.btn_toggle)
 
     def create_button_widget(self, name, color):
-        lbl = QLabel(name)
-        lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        lbl.setFixedSize(55, 30)
-        lbl.setStyleSheet(f"""
-            QLabel {{ background-color: {color}15; color: {color}; 
-                     border: 2px solid {color}; border-radius: 6px; 
-                     font-weight: bold; font-size: 10px; }}
-        """)
-        lbl.setProperty("base_color", color)
-        self.button_widgets[name] = lbl
-        return lbl
+        if name in self.xbox_buttons:
+            btn = QPushButton(name)
+            btn.setFixedSize(55, 30)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setStyleSheet(f"""
+                QPushButton {{ background-color: {color}15; color: {color}; 
+                             border: 2px solid {color}; border-radius: 6px; 
+                             font-weight: bold; font-size: 10px; }}
+                QPushButton:hover {{ background-color: {color}30; }}
+            """)
+            btn.setProperty("base_color", color)
+            btn.clicked.connect(lambda _, n=name: self.start_mapping(n))
+            self.button_widgets[name] = btn
+            return btn
+        else:
+            lbl = QLabel(name)
+            lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            lbl.setFixedSize(55, 30)
+            lbl.setStyleSheet(f"""
+                QLabel {{ background-color: {color}15; color: {color}; 
+                         border: 2px solid {color}; border-radius: 6px; 
+                         font-weight: bold; font-size: 10px; }}
+            """)
+            lbl.setProperty("base_color", color)
+            self.button_widgets[name] = lbl
+            return lbl
 
     def detect_joysticks(self):
         if winmm is None:
@@ -315,12 +384,7 @@ class XboxPassthrough(QWidget):
                 QPushButton:hover { background-color: #E53935; }
                 QPushButton:pressed { background-color: #B71C1C; }
             """)
-            self.test_console.setText("🔍 Pressione botões ou mova os analógicos do controle para testar...")
-            self.test_console.setStyleSheet("""
-                QLabel { background-color: #0A0E13; color: #56D4FF; 
-                        border: 1px solid #56D4FF; border-radius: 6px; 
-                        padding: 8px; font-family: Consolas; font-size: 11px; }
-            """)
+            self.log_area.setPlainText("🔍 Pressione botões ou mova os analógicos do controle para testar...")
             # Desabilita o botão de emular enquanto testa
             self.btn_toggle.setEnabled(False)
             if not self.timer.isActive():
@@ -335,12 +399,7 @@ class XboxPassthrough(QWidget):
                 QPushButton:hover { background-color: #6E6E6E; }
                 QPushButton:pressed { background-color: #404040; }
             """)
-            self.test_console.setText("Modo de teste desativado")
-            self.test_console.setStyleSheet("""
-                QLabel { background-color: #0A0E13; color: #AAAAAA; 
-                        border: 1px solid #2B3845; border-radius: 6px; 
-                        padding: 8px; font-family: Consolas; font-size: 11px; }
-            """)
+            self.log_area.setPlainText("Modo de teste desativado. Clique em 'TESTAR BOTÕES' para diagnosticar.")
             self.btn_toggle.setEnabled(True)
             if not self.running:
                 self.timer.stop()
@@ -405,47 +464,69 @@ class XboxPassthrough(QWidget):
             self.detect_joysticks()
             return
 
-        # MODO TESTE: Apenas mostrar quais eixos e botões estão ativos na tela
+        # 1. LÓGICA DE MAPEAMENTO INTERATIVO
+        if self.mapping_button:
+            for i in range(32):
+                pressed = bool(info.dwButtons & (1 << i))
+                prev_pressed = bool(self.prev_buttons_state & (1 << i))
+                if pressed and not prev_pressed:
+                    # Botão físico detectado!
+                    name = self.mapping_button
+                    self.buttons_config[name] = i
+                    save_config(self.buttons_config)
+                    self.mapping_button = None
+                    
+                    self.lbl_status.setText(f"✅ '{name}' mapeado para o botão físico {i} com sucesso!")
+                    self.lbl_status.setStyleSheet("color: #107C10; font-size: 11px; font-weight: bold;")
+                    self.update_button_labels()
+                    self.highlight_button(name, False)
+                    
+                    # Para o timer se não estiver emulação ou teste
+                    if not self.running and not self.testing_mode:
+                        self.timer.stop()
+                    break
+            self.prev_buttons_state = info.dwButtons
+            return
+
+        self.prev_buttons_state = info.dwButtons
+
+        # 2. MODO TESTE: Apenas mostrar quais eixos e botões estão ativos na tela
         if self.testing_mode:
             pressed_buttons = []
+            active_names = set()
             for i in range(32): # Limite de até 32 botões físicos
                 if bool(info.dwButtons & (1 << i)):
                     pressed_buttons.append(str(i))
-                    # Acende botões visuais correspondentes no grid se mapeados
-                    for mapped_idx, (name, _) in self.button_map.items():
-                        if mapped_idx == i:
-                            self.highlight_button(name, True)
-                else:
-                    # Apaga botões no grid
-                    for mapped_idx, (name, _) in self.button_map.items():
-                        if mapped_idx == i:
-                            self.highlight_button(name, False)
+                    for name, idx in self.buttons_config.items():
+                        if idx == i:
+                            active_names.add(name)
             
-            axes_str = f"X: {info.dwXpos} | Y: {info.dwYpos} | Z: {info.dwZpos} | R: {info.dwRpos}"
-            pov_str = f"POV: {info.dwPOV}"
+            # Atualiza o realce visual de todos os botões Xbox na tela
+            for name in self.xbox_buttons.keys():
+                self.highlight_button(name, name in active_names)
             
-            self.test_console.setText(
-                f"🔍 Botões (índices): {', '.join(pressed_buttons) if pressed_buttons else 'Nenhum'}\n"
-                f"📈 Eixos: {axes_str}\n"
-                f"🧭 D-Pad (POV): {pov_str if info.dwPOV != 65535 else 'Centralizado'}"
-            )
+            # Gera o log detalhado no QTextEdit em tempo real
+            log_text = self.generate_diagnostic_log(info)
+            self.log_area.setPlainText(log_text)
             return
 
-        # MODO EMULAÇÃO: Mapear para Xbox 360
+        # 3. MODO EMULAÇÃO: Mapear para Xbox 360
         if not self.running or not self.gamepad:
             return
 
         # Reseta os botões no controle virtual
         self.gamepad.reset()
 
-        # Lendo e mapeando botões digitais baseados em self.button_map
-        for btn_idx, (name, xbox_btn) in self.button_map.items():
-            pressed = bool(info.dwButtons & (1 << btn_idx))
-            if pressed:
-                self.gamepad.press_button(button=xbox_btn)
-                self.highlight_button(name, True)
-            else:
-                self.highlight_button(name, False)
+        # Lendo e mapeando botões digitais baseados em self.buttons_config
+        for name, xbox_btn in self.xbox_buttons.items():
+            btn_idx = self.buttons_config.get(name, -1)
+            if btn_idx != -1:
+                pressed = bool(info.dwButtons & (1 << btn_idx))
+                if pressed:
+                    self.gamepad.press_button(button=xbox_btn)
+                    self.highlight_button(name, True)
+                else:
+                    self.highlight_button(name, False)
 
         # Lendo e mapeando D-Pad (dwPOV)
         if info.dwPOV != 65535:
@@ -482,22 +563,144 @@ class XboxPassthrough(QWidget):
         if name in self.button_widgets:
             lbl = self.button_widgets[name]
             base_color = lbl.property("base_color")
+            widget_type = "QPushButton" if name in self.xbox_buttons else "QLabel"
             if pressed:
                 lbl.setStyleSheet(f"""
-                    QLabel {{ background-color: {base_color}; color: #000; 
-                             border: 2px solid #FFF; border-radius: 6px; 
-                             font-weight: bold; font-size: 10px; }}
+                    {widget_type} {{ background-color: {base_color}; color: #000; 
+                                 border: 2px solid #FFF; border-radius: 6px; 
+                                 font-weight: bold; font-size: 10px; }}
                 """)
             else:
-                lbl.setStyleSheet(f"""
-                    QLabel {{ background-color: {base_color}15; color: {base_color}; 
-                             border: 2px solid {base_color}; border-radius: 6px; 
-                             font-weight: bold; font-size: 10px; }}
-                """)
+                if name == self.mapping_button:
+                    lbl.setStyleSheet(f"""
+                        QPushButton {{ background-color: #FF5555; color: white; 
+                                     border: 2px solid white; border-radius: 6px; 
+                                     font-weight: bold; font-size: 10px; }}
+                    """)
+                else:
+                    lbl.setStyleSheet(f"""
+                        {widget_type} {{ background-color: {base_color}15; color: {base_color}; 
+                                     border: 2px solid {base_color}; border-radius: 6px; 
+                                     font-weight: bold; font-size: 10px; }}
+                    """)
 
     def reset_visual_buttons(self):
         for name in self.button_widgets:
             self.highlight_button(name, False)
+
+    def start_mapping(self, name):
+        if self.running:
+            self.lbl_status.setText("⚠ Pare a emulação antes de mapear!")
+            self.lbl_status.setStyleSheet("color: #FF5555; font-size: 11px;")
+            return
+        if self.testing_mode:
+            self.lbl_status.setText("⚠ Pare o teste antes de mapear!")
+            self.lbl_status.setStyleSheet("color: #FF5555; font-size: 11px;")
+            return
+            
+        if self.mapping_button == name:
+            self.cancel_mapping()
+            return
+            
+        if self.mapping_button:
+            self.cancel_mapping()
+
+        self.mapping_button = name
+        btn = self.button_widgets[name]
+        btn.setStyleSheet("""
+            QPushButton { background-color: #FF5555; color: white; 
+                         border: 2px solid white; border-radius: 6px; 
+                         font-weight: bold; font-size: 10px; }
+        """)
+        self.lbl_status.setText(f"🔴 APERTE o botão físico que será o '{name}'...")
+        self.lbl_status.setStyleSheet("color: #FF5555; font-weight: bold; font-size: 11px;")
+        
+        # Inicializa o estado anterior do botão para evitar gatilho instantâneo
+        if self.joystick_id is not None:
+            info = JOYINFOEX()
+            info.dwSize = ctypes.sizeof(JOYINFOEX)
+            info.dwFlags = JOY_RETURNALL
+            if winmm.joyGetPosEx(self.joystick_id, ctypes.byref(info)) == JOYERR_NOERROR:
+                self.prev_buttons_state = info.dwButtons
+
+        if not self.timer.isActive():
+            self.timer.start(16)
+
+    def cancel_mapping(self):
+        if self.mapping_button:
+            name = self.mapping_button
+            self.mapping_button = None
+            self.highlight_button(name, False)
+            self.lbl_status.setText("🔴 Mapeamento cancelado.")
+            self.lbl_status.setStyleSheet("color: #AAAAAA; font-size: 11px;")
+            if not self.running and not self.testing_mode:
+                self.timer.stop()
+
+    def update_button_labels(self):
+        for name in self.xbox_buttons.keys():
+            if name in self.button_widgets:
+                idx = self.buttons_config.get(name, -1)
+                text = f"{name} ({idx})" if idx != -1 else f"{name} (?)"
+                self.button_widgets[name].setText(text)
+
+
+    def generate_diagnostic_log(self, info=None):
+        if self.joystick_id is None or winmm is None:
+            return ""
+
+        caps = JOYCAPSW()
+        winmm.joyGetDevCapsW(self.joystick_id, ctypes.byref(caps), ctypes.sizeof(JOYCAPSW))
+        name = caps.szPname
+        num_buttons = caps.wNumButtons
+        num_axes = caps.wNumAxes
+
+        if info is None:
+            info = JOYINFOEX()
+            info.dwSize = ctypes.sizeof(JOYINFOEX)
+            info.dwFlags = JOY_RETURNALL
+            if winmm.joyGetPosEx(self.joystick_id, ctypes.byref(info)) != JOYERR_NOERROR:
+                return ""
+
+        log_text = f"--- DIAGNÓSTICO DO CONTROLE ---\n"
+        log_text += f"Nome: {name}\n"
+        log_text += f"Total Botões: {num_buttons}\n"
+        log_text += f"Total Eixos: {num_axes}\n"
+        log_text += "-------------------------------\n"
+
+        pressed_indices = []
+        for i in range(num_buttons):
+            if bool(info.dwButtons & (1 << i)):
+                pressed_indices.append(str(i))
+
+        if pressed_indices:
+            log_text += f"🔴 BOTÕES PRESSIONADOS AGORA: [{', '.join(pressed_indices)}]\n"
+        else:
+            log_text += "⚪ Nenhum botão pressionado no momento.\n"
+            
+        log_text += "-------------------------------\n"
+        log_text += "VALORES DOS EIXOS (Analógicos/Gatilhos):\n"
+        log_text += f"Eixo X (LX): {info.dwXpos}\n"
+        log_text += f"Eixo Y (LY): {info.dwYpos}\n"
+        log_text += f"Eixo Z (RX): {info.dwZpos}\n"
+        log_text += f"Eixo R (RY): {info.dwRpos}\n"
+        log_text += f"Eixo U (LT): {info.dwUpos}\n"
+        log_text += f"Eixo V (RT): {info.dwVpos}\n"
+        
+        log_text += "-------------------------------\n"
+        log_text += f"D-Pad (POV): {info.dwPOV if info.dwPOV != 65535 else 'Centralizado'}\n"
+
+        return log_text
+
+    def copy_diagnostic_log(self):
+        log_text = self.generate_diagnostic_log()
+        if not log_text:
+            self.log_area.setPlainText("Erro: Nenhum controle selecionado ou detectado para gerar log.")
+            return
+
+        clipboard = QApplication.clipboard()
+        clipboard.setText(log_text)
+        
+        self.log_area.setPlainText(log_text + "\n\n✅ LOG COPIADO PARA A ÁREA DE TRANSFERÊNCIA!\nAgora cole (Ctrl+V) na conversa com o Antigravity.")
 
     # --- Eventos de Arrasto da Janela ---
     def mousePressEvent(self, event):
