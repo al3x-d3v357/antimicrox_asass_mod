@@ -1,11 +1,72 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <joystick configversion="19" appversion="3.5.0">
     <!--The SDL name for a joystick is included for informational purposes only.-->
-    <sdlname>PS3 GamePad</sdlname>
+    <sdlname>Generic USB Joystick</sdlname>
     <!--The Unique ID for a joystick is included for informational purposes only.-->
-    <uniqueID>030014bc4c05000068020000000000001356616</uniqueID>
+    <uniqueID>03004f027900000006000000000000001216</uniqueID>
     <sets>
         <set index="1">
+            <axis index="3">
+                <throttle>normal</throttle>
+                <axisbutton index="1">
+                    <turbointerval>100</turbointerval>
+                    <useturbo>true</useturbo>
+                    <slots>
+                        <slot>
+                            <code>0x37</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                    </slots>
+                </axisbutton>
+                <axisbutton index="2">
+                    <turbointerval>100</turbointerval>
+                    <useturbo>true</useturbo>
+                    <slots>
+                        <slot>
+                            <code>0x38</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                    </slots>
+                </axisbutton>
+            </axis>
+            <axis index="5">
+                <throttle>normal</throttle>
+                <axisbutton index="1">
+                    <slots>
+                        <slot>
+                            <code>0x4b</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                    </slots>
+                </axisbutton>
+                <axisbutton index="2">
+                    <slots>
+                        <slot>
+                            <code>0x48</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                    </slots>
+                </axisbutton>
+            </axis>
+            <axis index="4">
+                <throttle>normal</throttle>
+                <axisbutton index="1">
+                    <slots>
+                        <slot>
+                            <code>0x37</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                    </slots>
+                </axisbutton>
+                <axisbutton index="2">
+                    <slots>
+                        <slot>
+                            <code>0x38</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                    </slots>
+                </axisbutton>
+            </axis>
             <axis index="2">
                 <throttle>normal</throttle>
                 <axisbutton index="1">
@@ -20,36 +81,6 @@
                     <slots>
                         <slot>
                             <code>0x53</code>
-                            <mode>keyboard</mode>
-                        </slot>
-                    </slots>
-                </axisbutton>
-            </axis>
-            <axis index="3">
-                <throttle>normal</throttle>
-                <axisbutton index="1">
-                    <slots>
-                        <slot>
-                            <code>0x48</code>
-                            <mode>keyboard</mode>
-                        </slot>
-                    </slots>
-                </axisbutton>
-                <axisbutton index="2">
-                    <slots>
-                        <slot>
-                            <code>0x37</code>
-                            <mode>keyboard</mode>
-                        </slot>
-                    </slots>
-                </axisbutton>
-            </axis>
-            <axis index="4">
-                <throttle>normal</throttle>
-                <axisbutton index="1">
-                    <slots>
-                        <slot>
-                            <code>0x4b</code>
                             <mode>keyboard</mode>
                         </slot>
                     </slots>
@@ -74,19 +105,42 @@
                     </slots>
                 </axisbutton>
             </axis>
-            <button index="16">
-                <toggle>true</toggle>
-                <turbointerval>100</turbointerval>
-                <useturbo>true</useturbo>
-                <slots>
-                    <slot>
-                        <code>0x45</code>
-                        <mode>keyboard</mode>
-                    </slot>
-                </slots>
-            </button>
-            <button index="15">
-                <turbointerval>100</turbointerval>
+            <dpad index="1">
+                <dpadbutton index="2">
+                    <slots>
+                        <slot>
+                            <code>0x33</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                    </slots>
+                </dpadbutton>
+                <dpadbutton index="8">
+                    <slots>
+                        <slot>
+                            <code>0x31</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                    </slots>
+                </dpadbutton>
+                <dpadbutton index="4">
+                    <slots>
+                        <slot>
+                            <code>0x34</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                    </slots>
+                </dpadbutton>
+                <dpadbutton index="1">
+                    <slots>
+                        <slot>
+                            <code>0x32</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                    </slots>
+                </dpadbutton>
+            </dpad>
+            <button index="3">
+                <turbointerval>250</turbointerval>
                 <useturbo>true</useturbo>
                 <slots>
                     <slot>
@@ -95,79 +149,23 @@
                     </slot>
                 </slots>
             </button>
-            <button index="5">
-                <slots>
-                    <slot>
-                        <code>0x32</code>
-                        <mode>keyboard</mode>
-                    </slot>
-                </slots>
-            </button>
-            <button index="2">
-                <turbointerval>100</turbointerval>
-                <useturbo>true</useturbo>
-                <slots>
-                    <slot>
-                        <code>0x47</code>
-                        <mode>keyboard</mode>
-                    </slot>
-                </slots>
-            </button>
-            <button index="14">
-                <turbointerval>100</turbointerval>
-                <useturbo>true</useturbo>
-                <slots>
-                    <slot>
-                        <code>0x51</code>
-                        <mode>keyboard</mode>
-                    </slot>
-                </slots>
-            </button>
-            <button index="11">
-                <turbointerval>100</turbointerval>
-                <useturbo>true</useturbo>
-                <slots>
-                    <slot>
-                        <code>0x59</code>
-                        <mode>keyboard</mode>
-                    </slot>
-                </slots>
-            </button>
-            <button index="7">
-                <slots>
-                    <slot>
-                        <code>0x34</code>
-                        <mode>keyboard</mode>
-                    </slot>
-                </slots>
-            </button>
-            <button index="8">
-                <slots>
-                    <slot>
-                        <code>0x31</code>
-                        <mode>keyboard</mode>
-                    </slot>
-                </slots>
-            </button>
-            <button index="13">
-                <toggle>true</toggle>
-                <turbointerval>100</turbointerval>
-                <slots>
-                    <slot>
-                        <code>0x54</code>
-                        <mode>keyboard</mode>
-                    </slot>
-                </slots>
-            </button>
             <button index="6">
                 <slots>
                     <slot>
-                        <code>0x33</code>
+                        <code>0x52</code>
                         <mode>keyboard</mode>
                     </slot>
                 </slots>
             </button>
-            <button index="3">
+            <button index="9">
+                <slots>
+                    <slot>
+                        <code>0x36</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                </slots>
+            </button>
+            <button index="12">
                 <turbointerval>100</turbointerval>
                 <useturbo>true</useturbo>
                 <slots>
@@ -177,12 +175,61 @@
                     </slot>
                 </slots>
             </button>
-            <button index="1">
+            <button index="10">
+                <slots>
+                    <slot>
+                        <code>0x35</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                </slots>
+            </button>
+            <button index="4">
+                <turbointerval>250</turbointerval>
+                <useturbo>true</useturbo>
+                <slots>
+                    <slot>
+                        <code>0x45</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                </slots>
+            </button>
+            <button index="2">
+                <toggle>true</toggle>
+                <turbointerval>250</turbointerval>
+                <useturbo>true</useturbo>
+                <slots>
+                    <slot>
+                        <code>0x51</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                </slots>
+            </button>
+            <button index="8">
                 <turbointerval>100</turbointerval>
                 <useturbo>true</useturbo>
                 <slots>
                     <slot>
-                        <code>0x36</code>
+                        <code>0x46</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                </slots>
+            </button>
+            <button index="11">
+                <turbointerval>100</turbointerval>
+                <useturbo>true</useturbo>
+                <slots>
+                    <slot>
+                        <code>0x47</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                </slots>
+            </button>
+            <button index="1">
+                <turbointerval>250</turbointerval>
+                <useturbo>true</useturbo>
+                <slots>
+                    <slot>
+                        <code>0x54</code>
                         <mode>keyboard</mode>
                     </slot>
                 </slots>
