@@ -6,6 +6,26 @@
     <uniqueID>03004f027900000006000000000000001216</uniqueID>
     <sets>
         <set index="1">
+            <!-- Eixo Analógico Esquerdo: Movimentação (WASD) -->
+            <axis index="1">
+                <throttle>normal</throttle>
+                <axisbutton index="1">
+                    <slots>
+                        <slot>
+                            <code>0x41</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                    </slots>
+                </axisbutton>
+                <axisbutton index="2">
+                    <slots>
+                        <slot>
+                            <code>0x44</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                    </slots>
+                </axisbutton>
+            </axis>
             <axis index="2">
                 <throttle>normal</throttle>
                 <axisbutton index="1">
@@ -25,6 +45,116 @@
                     </slots>
                 </axisbutton>
             </axis>
+            <!-- Eixo Analógico Direito: Câmera (Mouse) -->
+            <axis index="3">
+                <throttle>normal</throttle>
+                <axisbutton index="1">
+                    <slots>
+                        <slot>
+                            <code>3</code>
+                            <mode>mousemovement</mode>
+                        </slot>
+                    </slots>
+                </axisbutton>
+                <axisbutton index="2">
+                    <slots>
+                        <slot>
+                            <code>4</code>
+                            <mode>mousemovement</mode>
+                        </slot>
+                    </slots>
+                </axisbutton>
+            </axis>
+            <axis index="5">
+                <throttle>normal</throttle>
+                <axisbutton index="1">
+                    <slots>
+                        <slot>
+                            <code>1</code>
+                            <mode>mousemovement</mode>
+                        </slot>
+                    </slots>
+                </axisbutton>
+                <axisbutton index="2">
+                    <slots>
+                        <slot>
+                            <code>2</code>
+                            <mode>mousemovement</mode>
+                        </slot>
+                    </slots>
+                </axisbutton>
+            </axis>
+            <!-- Botão 1 (Triângulo): Supremo / Burst (Q) -->
+            <button index="1">
+                <slots>
+                    <slot>
+                        <code>0x51</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                </slots>
+            </button>
+            <!-- Botão 2 (Bolinha): Coletar / Interagir (F) -->
+            <button index="2">
+                <slots>
+                    <slot>
+                        <code>0x46</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                </slots>
+            </button>
+            <!-- Botão 3 (X): Pular (Espaço) -->
+            <button index="3">
+                <slots>
+                    <slot>
+                        <code>0x20</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                </slots>
+            </button>
+            <!-- Botão 4 (Quadrado): Habilidade Elemental (E) -->
+            <button index="4">
+                <slots>
+                    <slot>
+                        <code>0x45</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                </slots>
+            </button>
+            <!-- Botão 6 (R1): Modificador para Set 2 enquanto segurado -->
+            <button index="6">
+                <setselect>2</setselect>
+                <setselectcondition>while-held</setselectcondition>
+            </button>
+            <!-- Botão 8 (R2): Ataque Normal (Botão Esquerdo do Mouse) -->
+            <button index="8">
+                <slots>
+                    <slot>
+                        <code>1</code>
+                        <mode>mousebutton</mode>
+                    </slot>
+                </slots>
+            </button>
+            <!-- Botão 10 (R3 / Clique Analógico Direito): Correr / Dash (Shift Esquerdo) -->
+            <button index="10">
+                <slots>
+                    <slot>
+                        <code>0x1000020</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                </slots>
+            </button>
+            <!-- Botão 12 (Extra/Bolinha secundária mantida como F se aplicável) -->
+            <button index="12">
+                <slots>
+                    <slot>
+                        <code>0x46</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                </slots>
+            </button>
+        </set>
+        <set index="2">
+            <!-- Eixos mantidos iguais no Set 2 -->
             <axis index="1">
                 <throttle>normal</throttle>
                 <axisbutton index="1">
@@ -39,6 +169,25 @@
                     <slots>
                         <slot>
                             <code>0x44</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                    </slots>
+                </axisbutton>
+            </axis>
+            <axis index="2">
+                <throttle>normal</throttle>
+                <axisbutton index="1">
+                    <slots>
+                        <slot>
+                            <code>0x57</code>
+                            <mode>keyboard</mode>
+                        </slot>
+                    </slots>
+                </axisbutton>
+                <axisbutton index="2">
+                    <slots>
+                        <slot>
+                            <code>0x53</code>
                             <mode>keyboard</mode>
                         </slot>
                     </slots>
@@ -63,9 +212,6 @@
                     </slots>
                 </axisbutton>
             </axis>
-            <axis index="4">
-                <throttle>normal</throttle>
-            </axis>
             <axis index="5">
                 <throttle>normal</throttle>
                 <axisbutton index="1">
@@ -85,70 +231,69 @@
                     </slots>
                 </axisbutton>
             </axis>
-            <button index="2">
-                <toggle>true</toggle>
-                <turbointerval>100</turbointerval>
-                <useturbo>true</useturbo>
-                <slots>
-                    <slot>
-                        <code>0x45</code>
-                        <mode>keyboard</mode>
-                    </slot>
-                </slots>
-            </button>
+            <!-- R1 + Triângulo (Botão 1): Personagem 2 -->
             <button index="1">
-                <turbointerval>100</turbointerval>
-                <useturbo>true</useturbo>
                 <slots>
                     <slot>
-                        <code>0x51</code>
+                        <code>0x32</code>
                         <mode>keyboard</mode>
                     </slot>
                 </slots>
             </button>
+            <!-- R1 + Bolinha (Botão 2): Personagem 3 -->
+            <button index="2">
+                <slots>
+                    <slot>
+                        <code>0x33</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                </slots>
+            </button>
+            <!-- R1 + X (Botão 3): Personagem 4 -->
             <button index="3">
-                <turbointerval>100</turbointerval>
-                <useturbo>true</useturbo>
                 <slots>
                     <slot>
-                        <code>0x20</code>
+                        <code>0x34</code>
                         <mode>keyboard</mode>
                     </slot>
                 </slots>
             </button>
+            <!-- R1 + Quadrado (Botão 4): Personagem 1 -->
+            <button index="4">
+                <slots>
+                    <slot>
+                        <code>0x31</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                </slots>
+            </button>
+            <!-- Mantém o gatilho de retorno ao Set 1 quando soltar -->
+            <button index="6">
+                <setselect>1</setselect>
+                <setselectcondition>while-held</setselectcondition>
+            </button>
+            <!-- R1 + R2 (Botão 8): Modo de Mira / Arco (R) -->
+            <button index="8">
+                <slots>
+                    <slot>
+                        <code>0x52</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                </slots>
+            </button>
+            <!-- R1 + R3 (Botão 10): Visão Elemental (Botão do Meio do Mouse) -->
             <button index="10">
                 <slots>
                     <slot>
-                        <code>0x1000000</code>
-                        <mode>keyboard</mode>
-                    </slot>
-                </slots>
-            </button>
-            <button index="4">
-                <toggle>true</toggle>
-                <turbointerval>100</turbointerval>
-                <useturbo>true</useturbo>
-                <slots>
-                    <slot>
-                        <code>1</code>
-                        <mode>mousebutton</mode>
-                    </slot>
-                </slots>
-            </button>
-            <button index="6">
-                <slots>
-                    <slot>
-                        <code>3</code>
+                        <code>2</code>
                         <mode>mousebutton</mode>
                     </slot>
                 </slots>
             </button>
             <button index="12">
-                <turbointerval>100</turbointerval>
-                <useturbo>true</useturbo>
                 <slots>
                     <slot>
-                        <code>0x46</code>
+                        <code>0x33</code>
                         <mode>keyboard</mode>
                     </slot>
                 </slots>
