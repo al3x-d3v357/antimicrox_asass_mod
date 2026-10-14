@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<joystick configversion="19" appversion="3.5.0">
+    <!--The SDL name for a joystick is included for informational purposes only.-->
+    <sdlname>Generic USB Joystick</sdlname>
+    <!--The Unique ID for a joystick is included for informational purposes only.-->
+    <uniqueID>03004f027900000006000000000000001216</uniqueID>
+    <sets>
+        <set index="1">
+            <axis index="3">
+                <throttle>normal</throttle>
+            </axis>
+            <axis index="5">
+                <throttle>normal</throttle>
+            </axis>
+            <axis index="4">
+                <throttle>normal</throttle>
+            </axis>
+            <axis index="2">
+                <throttle>normal</throttle>
+            </axis>
+            <axis index="1">
+                <throttle>normal</throttle>
+            </axis>
+            <button index="3">
+                <turbointerval>100</turbointerval>
+                <useturbo>true</useturbo>
+                <slots>
+                    <slot>
+                        <code>0x4b</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                </slots>
+            </button>
+            <button index="4">
+                <turbointerval>100</turbointerval>
+                <useturbo>true</useturbo>
+                <slots>
+                    <slot>
+                        <code>0x4c</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                </slots>
+            </button>
+            <button index="2">
+                <turbointerval>100</turbointerval>
+                <useturbo>true</useturbo>
+                <slots>
+                    <slot>
+                        <code>0x4a</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                </slots>
+            </button>
+            <button index="1">
+                <turbointerval>100</turbointerval>
+                <useturbo>true</useturbo>
+                <slots>
+                    <slot>
+                        <code>0x49</code>
+                        <mode>keyboard</mode>
+                    </slot>
+                </slots>
+            </button>
+        </set>
+    </sets>
+</joystick>
